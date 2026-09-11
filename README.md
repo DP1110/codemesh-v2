@@ -71,7 +71,7 @@ The ESP8266 acts as a **dumb NDJSON relay** — it never buffers the full respon
 
 ```bash
 # Clone the repo
-git clone https://github.com/YOUR_USERNAME/codemesh-v2.git
+git clone https://github.com/DP1110/codemesh-v2.git
 cd codemesh-v2
 
 # Build (requires Android SDK)
