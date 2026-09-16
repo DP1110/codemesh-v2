@@ -2,6 +2,7 @@ package com.codemesh.app.viewmodel
 
 import android.app.Application
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.codemesh.app.data.AppDatabase
@@ -33,6 +34,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private val db = AppDatabase.getInstance(application)
     private val repository = HistoryRepository(db)
     private val bridgeClient = BridgeClient()
+    private val prefs = application.getSharedPreferences("codemesh_prefs", Context.MODE_PRIVATE)
+
+    private val prefListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+        reloadPreferences()
+    }
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
@@ -48,6 +54,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private var messagesJob: Job? = null
 
     init {
+        prefs.registerOnSharedPreferenceChangeListener(prefListener)
         loadPreferences()
         // Collect sessions reactively
         viewModelScope.launch {
@@ -68,6 +75,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
         startStatusPolling()
         refreshModels()
+    }
+
+    fun reloadPreferences() {
+        loadPreferences()
+        viewModelScope.launch {
+            refreshStatus()
+            refreshModels()
+        }
     }
 
     private fun loadPreferences() {
@@ -272,6 +287,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         super.onCleared()
+        prefs.unregisterOnSharedPreferenceChangeListener(prefListener)
         statusPollJob?.cancel()
         streamingJob?.cancel()
         messagesJob?.cancel()

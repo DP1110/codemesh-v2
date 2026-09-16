@@ -119,7 +119,10 @@ fun AppNavigation(chatViewModel: ChatViewModel, settingsViewModel: SettingsViewM
                 composable("settings") {
                     SettingsScreen(
                         viewModel = settingsViewModel,
-                        onBack = { navController.popBackStack() }
+                        onBack = {
+                            chatViewModel.reloadPreferences()
+                            navController.popBackStack()
+                        }
                     )
                 }
             }

@@ -8,6 +8,7 @@
         android:allowBackup="true"
         android:label="CodeMesh"
         android:supportsRtl="true"
+        android:usesCleartextTraffic="true"
         android:theme="@style/Theme.CodeMesh">
         <activity
             android:name=".ui.MainActivity"
