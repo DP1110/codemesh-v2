@@ -5,6 +5,7 @@ import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.codemesh.app.network.BridgeClient
+import com.codemesh.app.ui.ThemeStyle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,6 +29,15 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     var historyDepth: Int = prefs.getInt("history_depth", 20)
         private set
 
+    // Theme state
+    private val _themeStyle = MutableStateFlow(
+        when (prefs.getString("app_theme", "claude")) {
+            "chatgpt" -> ThemeStyle.CHATGPT
+            else -> ThemeStyle.CLAUDE
+        }
+    )
+    val themeStyle: StateFlow<ThemeStyle> = _themeStyle.asStateFlow()
+
     data class SaveState(
         val isSaving: Boolean = false,
         val saveResult: String? = null
@@ -35,6 +45,13 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     private val _saveState = MutableStateFlow(SaveState())
     val saveState: StateFlow<SaveState> = _saveState.asStateFlow()
+
+    fun setTheme(style: ThemeStyle) {
+        _themeStyle.value = style
+        prefs.edit()
+            .putString("app_theme", if (style == ThemeStyle.CHATGPT) "chatgpt" else "claude")
+            .apply()
+    }
 
     /**
      * Save all settings. Called from SettingsScreen with the current field values.

@@ -1,57 +1,38 @@
 package com.codemesh.app.ui
 
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
 
+// Legacy accessor — kept for backward compatibility during migration.
+// New code should use AppTheme.colors instead.
 object CodeMeshColors {
-    val Background = Color(0xFF0d0d1a)
-    val Panel = Color(0xFF13131f)
-    val PanelBorder = Color(0x0Dffffff)
-    val Primary = Color(0xFF00d4ff)
-    val Success = Color(0xFF00ff88)
-    val Warning = Color(0xFFff8800)
-    val UserBubbleBg = Color(0x1A00d4ff)
-    val UserBubbleBorder = Color(0x3300d4ff)
-    val AiBubbleBg = Color(0xFF1a1a2e)
-    val AiBubbleBorder = Color(0x0Dffffff)
-    val CodeBlockBg = Color(0xFF0a0a14)
-    val InlineCodeBg = Color(0x10ffffff)
-    val MutedText = Color(0xFFAAAAAA)
+    val Background @Composable get() = AppTheme.colors.base
+    val Surface @Composable get() = AppTheme.colors.surface
+    val Primary @Composable get() = AppTheme.colors.accent
+    val MutedText @Composable get() = AppTheme.colors.muted
+    val TextColor @Composable get() = AppTheme.colors.text
+    val CodeBg @Composable get() = AppTheme.colors.codeBg
+    val Error @Composable get() = AppTheme.colors.error
+    val Divider @Composable get() = AppTheme.colors.divider
 }
 
-private val DarkColorScheme = darkColorScheme(
-    primary = CodeMeshColors.Primary,
-    background = CodeMeshColors.Background,
-    surface = CodeMeshColors.Panel,
-    onPrimary = Color.Black,
-    onBackground = Color.White,
-    onSurface = Color.White
-)
-
-val AppTypography = Typography(
-    bodyLarge = TextStyle(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.Normal,
-        fontSize = 14.sp,
-        lineHeight = 20.sp,
-        letterSpacing = 0.5.sp
-    )
-)
-
 @Composable
-fun CodeMeshTheme(
-    content: @Composable () -> Unit
-) {
-    MaterialTheme(
-        colorScheme = DarkColorScheme,
-        typography = AppTypography,
-        content = content
+fun CodeMeshMaterialTheme(content: @Composable () -> Unit) {
+    val c = AppTheme.colors
+    val colorScheme = darkColorScheme(
+        primary = c.accent,
+        onPrimary = c.buttonText,
+        secondary = c.accent,
+        background = c.base,
+        surface = c.surface,
+        onSurface = c.text,
+        onBackground = c.text,
+        error = c.error,
+        outline = c.divider
     )
+    MaterialTheme(colorScheme = colorScheme) {
+        content()
+    }
 }

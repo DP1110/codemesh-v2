@@ -65,22 +65,27 @@ fun parseMarkdownSegments(markdown: String): List<MarkdownSegment> {
 }
 
 @Composable
-fun MarkdownText(
+fun MarkdownRenderer(
     markdown: String,
     modifier: Modifier = Modifier
 ) {
     val segments = remember(markdown) { parseMarkdownSegments(markdown) }
+    val colors = AppTheme.colors
 
     Column(modifier = modifier) {
         for (segment in segments) {
             when (segment) {
                 is MarkdownSegment.Text -> {
-                    MarkwonText(segment.content)
+                    MarkwonText(segment.content, textColor = colors.text)
                 }
                 is MarkdownSegment.CodeBlock -> {
                     CodeBlockView(
                         code = segment.code,
-                        language = segment.language
+                        language = segment.language,
+                        codeBg = colors.codeBg,
+                        mutedText = colors.muted,
+                        textColor = colors.text,
+                        accentColor = colors.accent
                     )
                 }
             }
@@ -88,9 +93,16 @@ fun MarkdownText(
     }
 }
 
+// Keep old name as alias for backward compat
 @Composable
-fun MarkwonText(content: String) {
+fun MarkdownText(markdown: String, modifier: Modifier = Modifier) {
+    MarkdownRenderer(markdown = markdown, modifier = modifier)
+}
+
+@Composable
+fun MarkwonText(content: String, textColor: Color = AppTheme.colors.text) {
     val context = LocalContext.current
+    val textArgb = textColor.toArgb()
     val markwon = remember {
         Markwon.builder(context)
             .usePlugin(TablePlugin.create(context))
@@ -101,28 +113,36 @@ fun MarkwonText(content: String) {
         modifier = Modifier.padding(vertical = 4.dp),
         factory = { ctx ->
             TextView(ctx).apply {
-                setTextColor(Color(0xFFE0E0E0).toArgb())
+                setTextColor(textArgb)
                 textSize = 14f
                 setLineSpacing(4f, 1.1f)
                 setTextIsSelectable(true)
             }
         },
         update = { textView ->
+            textView.setTextColor(textArgb)
             markwon.setMarkdown(textView, content)
         }
     )
 }
 
 @Composable
-fun CodeBlockView(code: String, language: String) {
+fun CodeBlockView(
+    code: String,
+    language: String,
+    codeBg: Color = AppTheme.colors.codeBg,
+    mutedText: Color = AppTheme.colors.muted,
+    textColor: Color = AppTheme.colors.text,
+    accentColor: Color = AppTheme.colors.accent
+) {
     val clipboardManager = LocalClipboardManager.current
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp)
-            .background(CodeMeshColors.CodeBlockBg, RoundedCornerShape(8.dp))
+            .background(codeBg, RoundedCornerShape(8.dp))
     ) {
-        // Header
+        // Header with language label and copy button
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -132,7 +152,7 @@ fun CodeBlockView(code: String, language: String) {
         ) {
             Text(
                 text = language.ifEmpty { "code" },
-                color = CodeMeshColors.MutedText,
+                color = mutedText,
                 fontSize = 12.sp
             )
             IconButton(
@@ -142,17 +162,17 @@ fun CodeBlockView(code: String, language: String) {
                 Icon(
                     Icons.Default.ContentCopy,
                     contentDescription = "Copy",
-                    tint = CodeMeshColors.MutedText,
+                    tint = mutedText,
                     modifier = Modifier.size(16.dp)
                 )
             }
         }
         
-        // Code Content
+        // Code content
         SelectionContainer {
             Text(
                 text = code,
-                color = Color(0xFFE0E0E0),
+                color = textColor,
                 fontFamily = FontFamily.Monospace,
                 fontSize = 13.sp,
                 modifier = Modifier
