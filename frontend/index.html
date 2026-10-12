@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeMesh v2.0 | Offline Mesh LLM Code Copilot</title>
+    <!-- Google Fonts for JetBrains Mono & Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Top Navigation / Header -->
+        <header class="app-header glass-panel">
+            <div class="brand-section">
+                <div class="logo-badge">
+                    <span class="logo-icon">⚡</span>
+                    <span class="logo-mesh-pulse"></span>
+                </div>
+                <div class="brand-text">
+                    <div class="brand-title">
+                        CodeMesh <span class="version-tag">v2.0</span>
+                    </div>
+                    <div class="brand-subtitle">Air-Gapped WiFi LLM Edge Mesh</div>
+                </div>
+            </div>
+
+            <!-- Header Connection & Node Status Badges -->
+            <div class="header-status-strip">
+                <div class="status-badge" id="backendStatusBadge" title="Server Connection Status">
+                    <span class="status-dot green"></span>
+                    <span class="badge-label">Mesh Server:</span>
+                    <span class="badge-val" id="backendStatusText">Online</span>
+                </div>
+                <div class="status-badge" id="wifiStatusBadge" title="ESP8266 Hardware Access Point">
+                    <span class="status-dot teal"></span>
+                    <span class="badge-label">AP:</span>
+                    <span class="badge-val" id="wifiSsidText">CodeMesh-AP</span>
+                </div>
+                <div class="status-badge hide-mobile" id="latencyBadge" title="Round-trip latency to scheduler">
+                    <span class="badge-label">Latency:</span>
+                    <span class="badge-val" id="latencyText">12ms</span>
+                </div>
+            </div>
+
+            <div class="header-actions">
+                <button class="icon-btn" id="openStatsBtn" title="Toggle System Telemetry">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+                    <span class="btn-text hide-mobile">Telemetry</span>
+                </button>
+                <button class="icon-btn" id="openSettingsBtn" title="Connection Settings">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Body Grid: Sidebar (Queue & Telemetry) + Main Chat -->
+        <main class="main-layout">
+            <!-- Sidebar: Live Queue & Scheduler Status -->
+            <aside class="sidebar-panel glass-panel" id="sidebarPanel">
+                <div class="sidebar-section-header">
+                    <span class="sec-title">Realtime Queue Matrix</span>
+                    <span class="live-indicator"><span class="pulse-ring"></span>LIVE</span>
+                </div>
+
+                <!-- Active Request Queue Card -->
+                <div class="queue-card gradient-border" id="queueStatusCard">
+                    <div class="queue-card-top">
+                        <span class="card-label">Your Queue Status</span>
+                        <span class="active-badge" id="queueStateBadge">Idle</span>
+                    </div>
+                    <div class="queue-position-display">
+                        <span class="position-symbol">#</span>
+                        <span class="position-number" id="queuePosNumber">0</span>
+                        <span class="position-total" id="queuePosTotal">in line</span>
+                    </div>
+                    <div class="queue-progress-bar-container">
+                        <div class="queue-progress-bar" id="queueProgressBar" style="width: 0%;"></div>
+                    </div>
+                    <div class="queue-meta-row">
+                        <span class="meta-item">Est. Wait: <b id="estWaitTime">0s</b></span>
+                        <span class="meta-item">Model: <b id="activeModelBadge">CodeLlama 7B</b></span>
+                    </div>
+                </div>
+
+                <!-- Mesh Active Users & Dot Visualization -->
+                <div class="mesh-network-box glass-card">
+                    <div class="box-header-row">
+                        <span class="box-title">Connected Mesh Peers</span>
+                        <span class="pill-badge" id="activeUsersCount">1 Active</span>
+                    </div>
+                    <div class="mesh-dots-grid" id="meshDotsContainer">
+                        <!-- Populated by JS: user nodes with priority colors -->
+                        <div class="mesh-dot-item current-user" title="You (Request active)">
+                            <span class="dot-indicator blue pulse"></span>
+                            <span class="dot-label">You</span>
+                        </div>
+                    </div>
+                    <div class="priority-legend">
+                        <span class="legend-chip"><i class="dot-mini red"></i>Critical</span>
+                        <span class="legend-chip"><i class="dot-mini amber"></i>High</span>
+                        <span class="legend-chip"><i class="dot-mini blue"></i>Normal</span>
+                    </div>
+                </div>
+
+                <!-- Collapsible Scheduler Stats Dashboard -->
+                <div class="scheduler-dashboard glass-card" id="schedulerStatsCard">
+                    <div class="dashboard-header" id="dashboardToggleBtn">
+                        <div class="dash-title-wrap">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+                            <span class="box-title">Scheduler Telemetry</span>
+                        </div>
+                        <span class="dash-toggle-icon">▼</span>
+                    </div>
+                    <div class="dashboard-content" id="dashboardContent">
+                        <div class="stat-grid">
+                            <div class="stat-box">
+                                <span class="stat-lbl">Served</span>
+                                <span class="stat-num" id="statServed">142</span>
+                            </div>
+                            <div class="stat-box">
+                                <span class="stat-lbl">Avg Wait</span>
+                                <span class="stat-num" id="statAvgWait">1.8s</span>
+                            </div>
+                            <div class="stat-box">
+                                <span class="stat-lbl">Throughput</span>
+                                <span class="stat-num" id="statTokensPerSec">38.4 t/s</span>
+                            </div>
+                            <div class="stat-box">
+                                <span class="stat-lbl">Preemptions</span>
+                                <span class="stat-num" id="statPreemptions">0</span>
+                            </div>
+                        </div>
+
+                        <!-- Queue Depth Visual Bar -->
+                        <div class="queue-depth-wrap">
+                            <div class="depth-labels">
+                                <span>Queue Depth</span>
+                                <span id="queueDepthLabel">0 / 16 Max</span>
+                            </div>
+                            <div class="queue-depth-meter">
+                                <div class="queue-depth-fill" id="queueDepthFill" style="width: 0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Fast Actions / Quick Prompts -->
+                <div class="quick-prompts-card glass-card">
+                    <span class="box-title">Fast Mesh Tasks</span>
+                    <div class="quick-chips">
+                        <button class="chip-btn" data-prompt="Review this code for edge-case vulnerabilities and concurrency bugs.">🛡️ Audit Security</button>
+                        <button class="chip-btn" data-prompt="Write unit tests with full boundary case coverage for:">🧪 Generate Tests</button>
+                        <button class="chip-btn" data-prompt="Refactor this function to be pure and O(N) complexity:">⚡ Optimize Code</button>
+                        <button class="chip-btn" data-prompt="Explain this snippet step-by-step and document parameters:">📖 Explain Snippet</button>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Main Chat Workspace Area -->
+            <section class="chat-workspace glass-panel">
+                <!-- Chat Stream Controls Bar -->
+                <div class="chat-controls-bar">
+                    <div class="control-group">
+                        <label for="modelSelect" class="control-label">AI Engine:</label>
+                        <select id="modelSelect" class="styled-select">
+                            <option value="auto">✨ Auto-Route (Smart Load)</option>
+                            <option value="codellama-7b" selected>CodeLlama 7B (Fast Local)</option>
+                            <option value="qwen-2.5-coder-7b">Qwen 2.5 Coder 7B (Deep Math)</option>
+                            <option value="deepseek-coder-6.7b">DeepSeek Coder 6.7B</option>
+                            <option value="mistral-7b-instruct">Mistral 7B Instruct</option>
+                        </select>
+                    </div>
+
+                    <div class="control-group priority-group">
+                        <span class="control-label">Mesh Priority:</span>
+                        <div class="priority-selector">
+                            <button class="priority-btn active" data-priority="normal" title="Normal queue priority (FIFO)">Normal</button>
+                            <button class="priority-btn" data-priority="high" title="Jump regular queue priority">High</button>
+                            <button class="priority-btn" data-priority="critical" title="Instant preemption / Urgent task">Critical</button>
+                        </div>
+                    </div>
+
+                    <div class="control-group right-actions">
+                        <button class="ghost-btn" id="clearChatBtn" title="Clear Chat History">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                            <span>Clear</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Chat Message Stream Log -->
+                <div class="chat-messages-scroll" id="chatMessagesContainer">
+                    <!-- Welcome Initial Message -->
+                    <div class="message-row ai-row">
+                        <div class="avatar ai-avatar">⚡</div>
+                        <div class="message-bubble ai-bubble">
+                            <div class="bubble-header">
+                                <span class="sender-name">CodeMesh v2.0 Router</span>
+                                <span class="message-meta">System Ready</span>
+                            </div>
+                            <div class="bubble-content">
+                                <p>Welcome to <strong>CodeMesh v2.0</strong>! You are connected to the offline edge inference node. Messages are scheduled through the priority queue and streamed token-by-token directly to your browser.</p>
+                                <ul>
+                                    <li>⚡ <strong>Zero Internet Required</strong>: Pure offline peer-to-peer code assistance.</li>
+                                    <li>🚦 <strong>Priority Queue</strong>: Choose <em>Normal</em>, <em>High</em>, or <em>Critical</em> to jump ahead.</li>
+                                    <li>🌊 <strong>Live SSE Streaming</strong>: Instant token-level rendering with live stats.</li>
+                                </ul>
+                                <p>Paste a function or ask any software design challenge below to start!</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dynamic Live Status Banner during Queue / Inference -->
+                <div class="live-action-banner hidden" id="liveActionBanner">
+                    <div class="banner-inner">
+                        <div class="action-spinner"></div>
+                        <span class="action-status-text" id="actionStatusText">Waiting in queue (Position #1)...</span>
+                        <button class="abort-btn" id="abortRequestBtn" title="Abort Request">Cancel</button>
+                    </div>
+                </div>
+
+                <!-- Input Composer Area -->
+                <div class="chat-composer-area">
+                    <form id="chatForm" class="composer-form">
+                        <div class="composer-wrapper gradient-border-focus">
+                            <textarea 
+                                id="chatInput" 
+                                class="composer-textarea" 
+                                placeholder="Ask CodeMesh to code, debug, optimize, or write unit tests... (Shift+Enter for new line)" 
+                                rows="2"
+                                required
+                            ></textarea>
+                            <div class="composer-toolbar">
+                                <div class="toolbar-left">
+                                    <span class="active-priority-pill" id="composerPriorityPill">Normal Priority</span>
+                                    <span class="stream-indicator-pill"><span class="pulse-dot"></span>SSE Ready</span>
+                                </div>
+                                <div class="toolbar-right">
+                                    <button type="submit" id="sendBtn" class="send-btn" title="Send (Enter)">
+                                        <span>Send Request</span>
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Configuration & Settings Modal -->
+    <div class="modal-backdrop hidden" id="settingsModal">
+        <div class="modal-dialog glass-panel">
+            <div class="modal-header">
+                <div class="modal-title-wrap">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    <h3>CodeMesh System Configuration</h3>
+                </div>
+                <button class="modal-close-btn" id="closeSettingsBtn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="settingHost">Backend IP or Hostname</label>
+                    <input type="text" id="settingHost" class="styled-input" placeholder="192.168.4.1 or localhost">
+                    <small class="help-text">IP of the host machine running the FastAPI backend or ESP8266 bridge (Default: localhost / 192.168.4.1).</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="settingPort">Backend Port</label>
+                    <input type="number" id="settingPort" class="styled-input" placeholder="8000">
+                    <small class="help-text">Port number for the CodeMesh v2 FastAPI server (Default: 8000).</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="settingProtocol">Protocol</label>
+                    <select id="settingProtocol" class="styled-select">
+                        <option value="http:">HTTP</option>
+                        <option value="https:">HTTPS</option>
+                    </select>
+                </div>
+
+                <div class="form-group checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="settingMockFallback" checked>
+                        <span>Enable Offline Demo Simulation (Mock fallback if server unreachable)</span>
+                    </label>
+                    <small class="help-text">Allows testing queue visualization and streaming token animation even without local LLM running.</small>
+                </div>
+
+                <div class="test-conn-area">
+                    <button class="secondary-btn" id="testConnectionBtn">Test Server Ping</button>
+                    <span id="testConnectionResult" class="test-result-text"></span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="ghost-btn" id="cancelSettingsBtn">Cancel</button>
+                <button class="primary-btn" id="saveSettingsBtn">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>

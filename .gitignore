@@ -49,3 +49,12 @@ captures/
 # External native build folder
 .cxx/
 .externalNativeBuild/
+
+# Python cache & virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+

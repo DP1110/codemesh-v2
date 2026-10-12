@@ -1,151 +1,182 @@
-# CodeMesh v2
+# CodeMesh v2.0 — Multi-Model LLM Scheduler
 
-> Claude Desktop–class offline LLM chat app powered by ESP8266 + Ollama
-
-<p align="center">
-  <img src="https://img.shields.io/badge/Android-Kotlin-7F52FF?logo=kotlin&logoColor=white" />
-  <img src="https://img.shields.io/badge/Jetpack_Compose-Material3-4285F4?logo=jetpackcompose&logoColor=white" />
-  <img src="https://img.shields.io/badge/ESP8266-Arduino-00979D?logo=arduino&logoColor=white" />
-  <img src="https://img.shields.io/badge/Ollama-LLM-000000?logo=ollama&logoColor=white" />
-</p>
+> **CPU Scheduling Meets AI Inference:** Round Robin + Priority Queue for fair multi-user LLM access over an offline WiFi mesh.
 
 ---
 
-## What is CodeMesh?
-
-CodeMesh is a **fully offline** AI coding assistant that runs on your phone. It connects to a local LLM (via [Ollama](https://ollama.com)) through an ESP8266 Wi-Fi bridge — no internet required.
-
-**Think Claude Desktop, but running entirely on your local network.**
-
-### Features
-
-- 🔥 **Live streaming** — tokens appear as they're generated, with blinking cursor
-- 💬 **Multi-turn chat** — full conversation history stored locally (Room DB)
-- 📝 **Markdown rendering** — headings, tables, bold/italic via Markwon
-- 💻 **Code blocks** — syntax-highlighted with copy-to-clipboard buttons
-- 📂 **Session management** — create, rename, delete chat sessions (Claude-style sidebar)
-- ⚙️ **Configurable** — bridge IP, laptop IP, model, system prompt, history depth
-- 🌙 **Dark theme** — cyberpunk-inspired dark UI with cyan/green accents
-- 🛑 **Stop generation** — cancel mid-stream by closing the HTTP connection
-
----
-
-## Architecture
+## 🏗️ Architecture Overview
 
 ```
-📱 Phone App                  📡 ESP8266 Bridge              💻 Laptop
-(Kotlin/Compose)              (Arduino firmware)              (Ollama)
-     │                              │                            │
-     │── POST /chat ──────────────►│── POST /api/chat ─────────►│
-     │                              │   (stream: true)           │
-     │◄── NDJSON line ─────────────│◄── NDJSON line ────────────│
-     │◄── NDJSON line ─────────────│◄── NDJSON line ────────────│
-     │◄── {done:true} ────────────│◄── {done:true} ────────────│
-     │                              │                            │
-     │  Wi-Fi AP: LLM-Bridge       │      USB/Ethernet          │
-     │  192.168.4.x                │      192.168.4.2            │
+┌─────────────────────────────────────────────────────────┐
+│  USERS (Phone / Tablet / Browser)                       │
+│  ┌──────┐ ┌──────┐ ┌──────┐                           │
+│  │ U001 │ │ U002 │ │ U003 │  ← up to 8 concurrent     │
+│  └──┬───┘ └──┬───┘ └──┬───┘                           │
+│     └────────┼────────┘                                │
+│              ▼                                          │
+│     ┌─────────────────┐                                │
+│     │  ESP8266 Bridge  │  ← WiFi AP "LLM-Bridge"       │
+│     │  Multi-User      │    Tracks users by IP          │
+│     │  Priority Headers│    X-User-Id, X-Priority       │
+│     └────────┬────────┘                                │
+│              ▼                                          │
+│     ┌─────────────────────────────────────────┐        │
+│     │  FastAPI Backend (Laptop / PC)          │        │
+│     │                                          │        │
+│     │  ┌──────────────────────────────────┐   │        │
+│     │  │     PRIORITY QUEUE               │   │        │
+│     │  │  CRITICAL > HIGH > NORMAL > LOW  │   │        │
+│     │  │  + Aging (starvation prevention) │   │        │
+│     │  └────────────┬─────────────────────┘   │        │
+│     │               ▼                          │        │
+│     │  ┌──────────────────────────────────┐   │        │
+│     │  │    ROUND ROBIN SCHEDULER         │   │        │
+│     │  │  Time Quantum: 512 tokens/slice  │   │        │
+│     │  │  Circular active ring            │   │        │
+│     │  │  Preemption for CRITICAL         │   │        │
+│     │  └────────────┬─────────────────────┘   │        │
+│     │               ▼                          │        │
+│     │  ┌──────────────────────────────────┐   │        │
+│     │  │   CONTINUOUS BATCHER             │   │        │
+│     │  │  Generate Q tokens per slice     │   │        │
+│     │  │  Save/resume context per user    │   │        │
+│     │  └────────────┬─────────────────────┘   │        │
+│     │               ▼                          │        │
+│     │  ┌──────────────────────────────────┐   │        │
+│     │  │   MULTI-MODEL ROUTER             │   │        │
+│     │  │  CodeLlama ← code queries        │   │        │
+│     │  │  LLaMA 3   ← general Q&A        │   │        │
+│     │  │  Mistral   ← reasoning/math      │   │        │
+│     │  └──────────────────────────────────┘   │        │
+│     │                                          │        │
+│     │  + Response Cache (LRU + TTL)           │        │
+│     │  + Session Manager (fair share 40%)     │        │
+│     └─────────────────────────────────────────┘        │
+│              ▼                                          │
+│     ┌─────────────────┐                                │
+│     │  Ollama Runtime  │  ← localhost:11434             │
+│     │  3 Models Loaded │                                │
+│     └─────────────────┘                                │
+└─────────────────────────────────────────────────────────┘
 ```
 
-The ESP8266 acts as a **dumb NDJSON relay** — it never buffers the full response (max 512B per line). This means RAM stays constant regardless of how long the LLM answer is.
-
----
-
-## Quick Start
-
-### Prerequisites
-
-- ESP8266 board (NodeMCU, Wemos D1 Mini, etc.)
-- Android phone (API 26+ / Android 8.0+)
-- Laptop with [Ollama](https://ollama.com) installed
-- Arduino IDE (for firmware)
-- Android Studio (for APK, or use prebuilt)
-
-### 1. Flash the Firmware
-
-1. Open `firmware/llm_bridge_v2.ino` in Arduino IDE
-2. Install **ESP8266** board package (Tools → Board Manager → search "esp8266")
-3. Install **ArduinoJson** library (Tools → Manage Libraries)
-4. Select your ESP8266 board and flash via USB
-
-### 2. Build the Android App
-
-```bash
-# Clone the repo
-git clone https://github.com/DP1110/codemesh-v2.git
-cd codemesh-v2
-
-# Build (requires Android SDK)
-./gradlew assembleDebug
-
-# Install
-adb install app/build/outputs/apk/debug/app-debug.apk
-```
-
-Or open the project in Android Studio and run directly.
-
-### 3. Connect Everything
-
-1. **Start Ollama** on your laptop:
-   ```bash
-   OLLAMA_HOST=0.0.0.0 ollama serve
-   ```
-2. **Pull a model** (if you haven't already):
-   ```bash
-   ollama pull llama3
-   ```
-3. **Power on** the ESP8266 bridge
-4. **Connect both** your phone and laptop to Wi-Fi: `LLM-Bridge` (password: `llm12345`)
-5. **Open CodeMesh** on your phone — it will auto-detect the bridge
-6. **Start chatting!** 🎉
-
----
-
-## Project Structure
+## 📂 Project Structure
 
 ```
-codemesh-v2/
+CodeMesh-v2/
 ├── firmware/
-│   └── llm_bridge_v2.ino           # ESP8266 NDJSON streaming relay
-├── app/src/main/java/com/codemesh/app/
-│   ├── data/                        # Room DB: Session, Message, DAOs
-│   ├── model/                       # ChatChunk, Status, ModelTag
-│   ├── network/                     # OkHttp client + NDJSON parser
-│   ├── viewmodel/                   # ChatViewModel, SettingsViewModel
-│   └── ui/                          # Jetpack Compose screens
-│       ├── ChatScreen.kt            # Main chat with streaming
-│       ├── SessionSidebar.kt        # Claude-style session drawer
-│       ├── SettingsScreen.kt        # Configuration
-│       ├── SetupScreen.kt           # Connection wizard
-│       ├── MarkdownRenderer.kt      # Markwon + code blocks
-│       └── Theme.kt                 # Dark cyberpunk theme
-└── docs/
-    └── WORKFLOW_v2.md               # Specification
+│   └── codemesh_v2.ino          # ESP8266 firmware (multi-user, priority headers, OLED)
+├── backend/
+│   ├── main.py                  # FastAPI server + SSE + WebSocket + scheduler loop
+│   ├── requirements.txt
+│   └── scheduler/
+│       ├── __init__.py
+│       ├── engine.py            # RoundRobinScheduler + PriorityQueue + SchedulerStats
+│       ├── batcher.py           # ContinuousBatcher (Ollama token slice streaming)
+│       ├── router.py            # ModelRouter (auto-route: code/general/reasoning)
+│       ├── sessions.py          # SessionManager + UserSession (fair share)
+│       └── cache.py             # ResponseCache (LRU + SHA-256 prompt hashing)
+├── frontend/
+│   ├── index.html               # Dark-theme UI with queue visualization
+│   ├── styles.css               # Glassmorphism + animations
+│   └── app.js                   # SSE streaming + queue polling + stats dashboard
+└── README.md
 ```
 
-## Bridge API
+## 🚀 Quick Start
+
+### 1. Start Ollama with 3 Models
+```bash
+ollama pull llama3:8b
+ollama pull codellama:7b
+ollama pull mistral:7b
+ollama serve
+```
+
+### 2. Start the Backend
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+### 3. Flash the ESP8266
+1. Open `firmware/codemesh_v2.ino` in Arduino IDE.
+2. Set Board: NodeMCU 1.0 (ESP-12E).
+3. Upload.
+4. The ESP creates WiFi AP "LLM-Bridge" (password: `llm12345`).
+
+### 4. Connect & Use
+1. Connect your phone/tablet to "LLM-Bridge" WiFi.
+2. Connect your laptop (running Ollama + FastAPI) to "LLM-Bridge" WiFi.
+3. Open `http://192.168.4.1` on your phone — the queue-aware chat UI loads.
+
+## 🧠 How the Scheduler Works
+
+### Round Robin (Not FCFS!)
+Unlike traditional systems that serve requests first-come-first-served (blocking all others),
+CodeMesh uses **Round Robin scheduling**:
+
+1. Each user gets a **time quantum** of 512 tokens.
+2. After generating 512 tokens for User A, the scheduler **rotates** to User B.
+3. User A's generation is **paused** (context saved) and resumed later.
+4. This ensures **fair, responsive access** for all connected users.
+
+### Priority Queue
+Requests enter a **priority queue** before the RR ring:
+
+| Priority | Use Case | Behavior |
+|----------|----------|----------|
+| CRITICAL | Security audit, urgent fix | **Preempts** active requests |
+| HIGH | Important code generation | Promoted ahead of NORMAL |
+| NORMAL | Regular chat/code queries | Standard Round Robin |
+| LOW | Background tasks | Runs when queue is empty |
+
+### Starvation Prevention (Aging)
+- After **5 skips**, LOW priority → NORMAL.
+- After **10 skips**, NORMAL → HIGH.
+- No request is starved forever.
+
+### Continuous Batching
+Instead of waiting for a full response:
+- Generate tokens in **slices** (time quanta).
+- Between slices, **yield to other users**.
+- Resume from saved context when turn comes back.
+
+## 🤖 Smart Model Router
+Queries are automatically routed to the best model:
+
+| Query Type | Model | Keywords |
+|-----------|-------|----------|
+| Code | `codellama:7b` | write, debug, function, class, implement, python |
+| General | `llama3:8b` | explain, what, how, why, describe, help |
+| Reasoning | `mistral:7b` | compare, analyze, logic, math, optimize |
+
+## 📊 API Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/chat` | POST | Relay chat to Ollama, stream NDJSON back |
-| `/status` | GET | Bridge status (model, IP, free memory) |
-| `/config` | POST | Update laptop IP and model |
-| `/models` | GET | List available Ollama models |
+| `/api/v2/chat` | POST | Submit chat request with priority |
+| `/api/v2/stream/{id}` | GET | SSE token stream |
+| `/api/v2/queue` | GET | Queue status + active requests |
+| `/api/v2/models` | GET | Models + health + specialty |
+| `/api/v2/stats` | GET | Scheduler telemetry |
+| `/api/v2/preempt` | POST | Critical priority request |
+| `/api/v2/health` | GET | Health check |
 
----
+## 💡 Novel Features
 
-## Tech Stack
+1. **Response Caching** — Identical prompts served instantly from LRU cache.
+2. **Fair Share Enforcement** — No user can consume >40% of total throughput.
+3. **Adaptive Time Quantum** — Adjusts based on queue depth and user wait time.
+4. **Speculative Model Switching** — If primary model is slow, tries a faster one.
+5. **Request Coalescing** — Similar concurrent queries share one generation.
 
-| Component | Technology |
-|-----------|-----------|
-| Android UI | Jetpack Compose + Material 3 |
-| Database | Room 2.6.1 |
-| HTTP | OkHttp 4.12.0 |
-| Markdown | Markwon 4.6.2 + Prism4j |
-| Firmware | Arduino (ESP8266) |
-| LLM Backend | Ollama |
+## 📱 Hardware Cost
+| Component | Cost |
+|-----------|------|
+| ESP8266 NodeMCU V3 | ₹200-300 |
+| USB Cable | ₹50 |
+| **Total** | **₹250-350** |
 
----
-
-## License
-
-MIT
+All software is free and open-source. Your existing laptop runs the LLM.
