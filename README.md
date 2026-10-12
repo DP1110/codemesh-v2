@@ -172,11 +172,6 @@ Queries are automatically routed to the best model:
 4. **Speculative Model Switching** — If primary model is slow, tries a faster one.
 5. **Request Coalescing** — Similar concurrent queries share one generation.
 
-## 📱 Hardware Cost
-| Component | Cost |
-|-----------|------|
-| ESP8266 NodeMCU V3 | ₹200-300 |
-| USB Cable | ₹50 |
-| **Total** | **₹250-350** |
+|
 
 All software is free and open-source. Your existing laptop runs the LLM.
