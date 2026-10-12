@@ -1,4 +1,4 @@
-# CodeMesh v2.0 — Multi-Model LLM Scheduler
+# CodeMesh v2.0 — Multi-Model LLM 
 
 > **CPU Scheduling Meets AI Inference:** Round Robin + Priority Queue for fair multi-user LLM access over an offline WiFi mesh.
 
