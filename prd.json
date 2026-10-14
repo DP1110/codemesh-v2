@@ -1,0 +1,86 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "project": "CodeMesh",
+  "version": "2.2.0",
+  "title": "Unified Multi-Tenant Autonomous Edge LLM Mesh",
+  "status": "APPROVED",
+  "features": [
+    {
+      "id": "FEAT-001",
+      "name": "Adaptive Time-Quantum Engine",
+      "description": "Dynamic scaling of Round Robin inference quantum based on concurrency pressure and wait times",
+      "priority": "P0",
+      "components": [
+        "backend/scheduler/adaptive_quantum.py",
+        "backend/scheduler/engine.py"
+      ],
+      "tests": [
+        "test_adaptive_quantum_scaling",
+        "test_starvation_mitigation_burst"
+      ]
+    },
+    {
+      "id": "FEAT-002",
+      "name": "Speculative Model Pre-warming & Fallback",
+      "description": "Background model warmup in Ollama and deadline-based watchdog fallback",
+      "priority": "P0",
+      "components": [
+        "backend/scheduler/speculative_warmer.py",
+        "backend/scheduler/batcher.py"
+      ],
+      "tests": [
+        "test_speculative_prewarm_trigger",
+        "test_latency_watchdog_fallback"
+      ]
+    },
+    {
+      "id": "FEAT-003",
+      "name": "Offline Semantic RAG & Local Code Retrieval",
+      "description": "Zero-dependency local BM25 and keyword search for offline codebases and docs",
+      "priority": "P1",
+      "components": [
+        "backend/rag/search_engine.py",
+        "backend/main.py"
+      ],
+      "tests": [
+        "test_rag_indexing_and_scoring"
+      ]
+    },
+    {
+      "id": "FEAT-004",
+      "name": "Android Native Priority & Queue Telemetry UI",
+      "description": "Jetpack Compose priority selector, live animated queue badge, and telemetry bridge in Android app",
+      "priority": "P1",
+      "components": [
+        "app/src/main/java/com/codemesh/app/ui/ChatScreen.kt",
+        "app/src/main/java/com/codemesh/app/network/BridgeClient.kt",
+        "app/src/main/java/com/codemesh/app/viewmodel/ChatViewModel.kt"
+      ],
+      "tests": [
+        "verify_compose_state_flow"
+      ]
+    }
+  ],
+  "milestones": [
+    {
+      "step": 1,
+      "title": "Core Scheduler ATQ & Speculative Pre-warming",
+      "status": "in_progress"
+    },
+    {
+      "step": 2,
+      "title": "Local Semantic RAG Engine",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "title": "Android UI Telemetry Integration",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "title": "Comprehensive Autonomous Quality & Code Review Audit",
+      "status": "pending"
+    }
+  ]
+}

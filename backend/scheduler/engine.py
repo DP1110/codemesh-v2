@@ -95,6 +95,26 @@ class RoundRobinScheduler:
         self.aging_counter: Dict[str, int] = {}         # request_id -> number of skips
         self.stats: SchedulerStats = SchedulerStats()
         self._lock: asyncio.Lock = asyncio.Lock()
+        
+        # Adaptive Time-Quantum (ATQ) Engine
+        from .adaptive_quantum import AdaptiveQuantumManager
+        self.quantum_manager = AdaptiveQuantumManager(
+            base_quantum=time_quantum,
+            min_quantum=128,
+            max_quantum=1024
+        )
+
+    def get_effective_quantum(self, request: InferenceRequest) -> int:
+        """Returns the dynamic adaptive quantum for this specific request."""
+        active_count = len(self.active_ring)
+        q_depth = len(self.priority_queue)
+        wait_time = (time.time() - request.created_at) if request.created_at else 0.0
+        return self.quantum_manager.compute_quantum(
+            active_users_count=max(1, active_count),
+            queue_depth=q_depth,
+            priority_level=int(request.priority),
+            wait_time_seconds=wait_time,
+        )
 
     async def submit(self, request: InferenceRequest) -> str:
         """

@@ -154,6 +154,23 @@ private fun TopBar(
             }
         }
 
+        // Queue Badge
+        if (uiState.queuePosition > 0) {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = colors.accent.copy(alpha = 0.2f),
+                modifier = Modifier.padding(horizontal = 4.dp)
+            ) {
+                Text(
+                    text = "Q: #${uiState.queuePosition}",
+                    color = colors.accent,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+            }
+        }
+
         // Status dot
         StatusDot(state = uiState.connectionState, colors = colors)
 

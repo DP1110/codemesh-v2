@@ -34,6 +34,8 @@ from scheduler.batcher import ContinuousBatcher
 from scheduler.router import ModelRouter
 from scheduler.sessions import SessionManager, UserSession
 from scheduler.cache import ResponseCache
+from scheduler.speculative_warmer import SpeculativeWarmer
+from rag.search_engine import LocalOfflineRAG
 
 # Configure logging
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -246,6 +248,17 @@ router: ModelRouter = ModelRouter(ollama_url=os.getenv("OLLAMA_URL", "http://loc
 session_manager: SessionManager = SessionManager(max_fair_share_pct=0.4, default_token_ceiling=50000)
 cache: ResponseCache = ResponseCache(max_size=200, ttl_seconds=300)
 broadcaster: StreamBroadcaster = StreamBroadcaster()
+warmer: SpeculativeWarmer = SpeculativeWarmer(ollama_url=os.getenv("OLLAMA_URL", "http://localhost:11434"))
+rag_engine: LocalOfflineRAG = LocalOfflineRAG()
+
+# Pre-populate RAG with project documentation and notes
+try:
+    rag_engine.add_document("doc-1", "CodeMesh Architecture", "CodeMesh is an offline WiFi bridge system for local LLM-assisted code editing with Monaco and FastAPI.", "docs/WORKFLOW_v2.md")
+    rag_engine.add_document("doc-2", "Round Robin Scheduling", "Continuous batching and adaptive time quanta provide fair inference turns across multi-tenant clients.", "docs/PRD.md")
+    rag_engine.add_document("doc-3", "ESP8266 Firmware Guide", "NodeMCU creates the LLM-Bridge AP and relays SSE chunks to connected devices.", "firmware/codemesh_v2.ino")
+    rag_engine.build_index()
+except Exception as _rag_err:
+    logger.warning("RAG initialization notice: %s", _rag_err)
 
 server_start_time: float = time.time()
 scheduler_task: Optional[asyncio.Task] = None
@@ -290,8 +303,9 @@ async def scheduler_loop() -> None:
                 session_manager.decrement_active_requests(request.user_id)
                 continue
 
-            # 3. Generate a slice of tokens via batcher
-            tokens: List[str] = await batcher.generate_slice(request, scheduler.time_quantum)
+            # 3. Generate a slice of tokens via batcher using dynamic Adaptive Time-Quantum
+            dynamic_quantum = scheduler.get_effective_quantum(request)
+            tokens: List[str] = await batcher.generate_slice(request, dynamic_quantum)
 
             # Determine whether generation has finished
             is_complete = (
@@ -449,6 +463,12 @@ async def submit_chat(payload: ChatRequest, request: Request) -> ChatSubmissionR
 
     # Determine model via Smart Router
     selected_model = router.route(messages, preferred_model=payload.model)
+
+    # Trigger speculative pre-warming in background
+    try:
+        asyncio.create_task(warmer.prewarm(selected_model))
+    except Exception:
+        pass
 
     # Instantiate Inference Request
     request_id = str(uuid.uuid4())
@@ -690,11 +710,24 @@ async def health_check() -> HealthResponse:
     total_connections = sum(len(q_list) for q_list in broadcaster._subscribers.values())
     return HealthResponse(
         status="ok",
-        version="2.0.0",
+        version="2.2.0",
         uptime_seconds=round(uptime, 2),
         active_connections=total_connections,
         queue_depth=len(scheduler.priority_queue),
     )
+
+
+@app.get("/api/v2/rag/search")
+async def rag_search_endpoint(q: str, limit: int = 3):
+    """
+    Offline local BM25 search over documentation and code notes.
+    """
+    results = rag_engine.search(query=q, top_k=limit)
+    return {
+        "query": q,
+        "count": len(results),
+        "results": results,
+    }
 
 
 # ---------------------------------------------------------------------------

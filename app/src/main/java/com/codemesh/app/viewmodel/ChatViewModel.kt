@@ -23,6 +23,8 @@ data class ChatUiState(
     val sessions: List<Session> = emptyList(),
     val models: List<ModelTag> = emptyList(),
     val selectedModel: String = "llama3",
+    val selectedPriority: String = "normal",
+    val queuePosition: Int = 0,
     val bridgeStatus: Status? = null,
     val connectionState: ConnectionState = ConnectionState.UNKNOWN,
     val error: String? = null
@@ -257,6 +259,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             bridgeClient.postConfig(laptopIp, model)
             savePreferences()
         }
+    }
+
+    fun selectPriority(priority: String) {
+        _uiState.update { it.copy(selectedPriority = priority) }
     }
 
     private fun startStatusPolling() {
